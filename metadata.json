@@ -1,0 +1,11 @@
+{
+  "name": "SOYO Mind - A Virtual Artificial Intelligence",
+  "description": "SOYO Mind VAI - Premium virtual AI assistant with conversational intelligence, live vision camera, photo enhancement studio, 100+ languages, and voice interaction.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
