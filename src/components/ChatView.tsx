@@ -112,19 +112,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       speechService.speak(
         msg.content,
-        voiceSettings?.speed || 1.0,
-        voiceSettings?.pitch || 1.0,
-        voiceSettings?.voiceIndex !== undefined ? voiceSettings.voiceIndex : -1,
-        () => {
-          setPlaying(null);
-          setSpeakingCharIndex(0);
-        },
-        (charIndex) => {
-          boundaryFiredRef.current = true;
-          setSpeakingCharIndex(charIndex);
-        },
-        () => {
-          setPlaying(msg.id);
+        {
+          speed: voiceSettings?.speed || 1.02,
+          pitch: voiceSettings?.pitch !== undefined ? voiceSettings.pitch : 0.88,
+          voiceIndex: voiceSettings?.voiceIndex !== undefined ? voiceSettings.voiceIndex : -1,
+          voiceGender: voiceSettings?.voiceGender || 'male',
+          voiceName: voiceSettings?.voiceName,
+          voiceTone: voiceSettings?.voiceTone || 'jarvis-deep',
+          onEnd: () => {
+            setPlaying(null);
+            setSpeakingCharIndex(0);
+          },
+          onBoundary: (charIndex) => {
+            boundaryFiredRef.current = true;
+            setSpeakingCharIndex(charIndex);
+          },
+          onStart: () => {
+            setPlaying(msg.id);
+          },
         }
       );
     }

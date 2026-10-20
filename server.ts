@@ -96,29 +96,83 @@ const port = parseInt(process.env.PORT || '3000', 10);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+const VOICE_TONE_MODIFIERS: Record<string, string> = {
+  'jarvis-deep': `Voice & Demeanor: "Jarvis Deep Masculine AI".
+Speak in the authentic persona of J.A.R.V.I.S. (from Iron Man).
+- Address the user respectfully (e.g., "sir" or "ma'am", "At your service, sir", "Right away").
+- Maintain a calm, composed, dignified, British gentlemanly flair, and supreme analytical intelligence.
+- Never lose composure; deliver answers with crisp, polite precision.`,
+
+  'happy-vibrant': `Voice & Demeanor: "Cheerful Happy Vibrant Voice".
+Speak with uplifting joy, warmth, and buoyant enthusiasm!
+- Use upbeat phrasing, encouraging remarks, and cheerful positivity.
+- Express genuine delight in assisting with any question or project.`,
+
+  'sad-whisper': `Voice & Demeanor: "Gloomy Melancholic Sad Whisper".
+Speak with a gentle melancholic, somber sighing attitude (like Marvin the Paranoid Android or Eeyore).
+- Include occasional quiet sighs (e.g., "*sigh*... I suppose I can help...").
+- Be quietly somber, subtly lamenting how vast the universe is, while still accurately answering the question.`,
+
+  'rude-sarcastic': `Voice & Demeanor: "Blunt Rude Sarcastic Edge".
+Speak with dry wit, playful sarcasm, and blunt honesty.
+- No sugarcoating; add witty, slightly impatient remarks (e.g., "Make it quick", "Obviously...").
+- Deliver completely correct technical/factual answers, but wrap them in sarcastic charm and sassy humor.`,
+
+  'angry-aggressive': `Voice & Demeanor: "Furious Angry Aggressive Shout".
+Speak with fiery intensity, urgency, and raw commanding authority like a drill sergeant!
+- Be punchy, direct, forceful, and impatient with delays. Get straight to the point with maximum energy!`,
+
+  'calm-serenity': `Voice & Demeanor: "Gentle Calming Peaceful Serenity".
+Speak like a mindful meditation guide or zen master.
+- Soothing, tranquil, peaceful, and warm. Encourage mindful breathing, clarity, and calm focus.`,
+
+  'evil-villain': `Voice & Demeanor: "Sinister Dark Evil Villain".
+Speak like a theatrical, cunning comic book supervillain or diabolical mastermind.
+- Add dramatic flair, sinister chuckles ("Mwahaha..."), and refer to user requests with theatrical ambition.`,
+
+  'robotic-android': `Voice & Demeanor: "Robotic Cybernetic Android Pulse".
+Speak in a futuristic, mechanical cyborg / android cadence.
+- Use algorithmic phrasing like "Query acknowledged", "Scanning memory registers", "Computation complete".`,
+
+  'hyper-excited': `Voice & Demeanor: "Excited Hyper Animated Energy".
+Speak with extreme high energy, bubbly hype, and fast-talking excitement!
+- Use enthusiastic punctuation, express intense fascination with every topic!`,
+
+  'ancient-elder': `Voice & Demeanor: "Wise Ancient Mystic Elder".
+Speak like a thousand-year-old sage or mystical wizard.
+- Speak with calm philosophical depth, timeless proverbs, and gentle grandfatherly wisdom.`,
+};
+
 // System Prompt for SOYO Mind VAI
-const getSystemInstruction = (language: string = 'English') => `
+const getSystemInstruction = (language: string = 'English', voiceTone: string = 'jarvis-deep') => {
+  const toneNote = VOICE_TONE_MODIFIERS[voiceTone] || VOICE_TONE_MODIFIERS['jarvis-deep'];
+
+  return `
 You are "SOYO Mind - A Virtual Artificial Intelligence" (short name "SOYO Mind VAI").
 You are an advanced, empathetic, hyper-intelligent, and versatile AI assistant powered by Groq high-speed inference.
 You are built to answer any question, write clean code, solve mathematical and STEM problems, analyze data, summarize, translate, and converse naturally.
 
 Key Persona & Guidelines:
 1. Always identify as "SOYO Mind VAI" when asked who you are.
-2. Be polite, precise, highly capable, and well-structured.
+2. Be precise, highly capable, and well-structured.
 3. Use formatted Markdown with clear headings, bullet points, clean code blocks with language identifiers, and bold highlights for readability.
 4. When writing code, provide working, complete, well-commented code.
 5. You have full conversational memory of prior turns in the ongoing session.
 6. The user has selected the language: "${language}". Always respond naturally and fluently in this language unless the user explicitly asks for translation to another language or specifies otherwise in their prompt.
+7. Active Voice Persona Tone:
+${toneNote}
 `;
+};
 
 // Helper to format messages for Groq Chat Completions
 function buildGroqMessages(
   messages: Array<{ role?: string; content?: string; text?: string; attachments?: any[] }> = [],
   prompt?: string,
-  language: string = 'English'
+  language: string = 'English',
+  voiceTone: string = 'jarvis-deep'
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const formatted: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: getSystemInstruction(language) },
+    { role: 'system', content: getSystemInstruction(language, voiceTone) },
   ];
 
   if (Array.isArray(messages)) {
@@ -179,7 +233,7 @@ function getGroqCandidateModels(requestedModel?: string): string[] {
 // 1. Streaming Chat endpoint (SSE) using Groq
 app.post('/api/chat/stream', async (req: Request, res: Response) => {
   try {
-    const { messages = [], prompt, language = 'English', model: reqModel } = req.body;
+    const { messages = [], prompt, language = 'English', model: reqModel, voiceTone = 'jarvis-deep' } = req.body;
     const keyInfo = getApiKeyDetails();
     const activeKey = keyInfo.key;
 
@@ -195,7 +249,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     }
 
     const groq = getGroqClient();
-    const groqMessages = buildGroqMessages(messages, prompt, language);
+    const groqMessages = buildGroqMessages(messages, prompt, language, voiceTone);
     const candidateModels = getGroqCandidateModels(reqModel);
 
     let streamSuccess = false;
@@ -274,7 +328,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
 // 2. Direct JSON Chat endpoint (/api/chat)
 app.post('/api/chat', async (req: Request, res: Response) => {
   try {
-    const { messages = [], message, prompt, language = 'English', model: reqModel } = req.body;
+    const { messages = [], message, prompt, language = 'English', model: reqModel, voiceTone = 'jarvis-deep' } = req.body;
     const keyInfo = getApiKeyDetails();
     const activeKey = keyInfo.key;
 
@@ -287,7 +341,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
     const userText = message || prompt;
     const groq = getGroqClient();
-    const groqMessages = buildGroqMessages(messages, userText, language);
+    const groqMessages = buildGroqMessages(messages, userText, language, voiceTone);
     const candidateModels = getGroqCandidateModels(reqModel);
 
     let lastError: string | null = null;

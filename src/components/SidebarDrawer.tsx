@@ -23,9 +23,13 @@ import {
   Moon,
   LogIn,
   Check,
+  ImagePlus,
+  Upload,
 } from 'lucide-react';
 import { TranslationKeys, UserProfile, AppearanceSettings } from '../types';
 import { triggerVisualFx, playTechClickSound } from '../utils/visualFx';
+import { TEN_THEMES, ThemeId } from '../data/themes';
+import { processGalleryImage } from '../utils/galleryTheme';
 
 export type DrawerAction =
   | 'languages'
@@ -51,6 +55,9 @@ interface SidebarDrawerProps {
   onClose: () => void;
   onSelectAction: (action: DrawerAction) => void;
   onSetThemeMode?: (mode: 'light' | 'dark') => void;
+  onSelectTheme?: (themeId: ThemeId) => void;
+  onSetCustomWallpaper?: (wallpaperDataUrl: string, fileName?: string) => void;
+  onRemoveCustomWallpaper?: () => void;
   t: TranslationKeys;
   currentLanguageName: string;
   currentLanguageFlag: string;
@@ -64,6 +71,9 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onClose,
   onSelectAction,
   onSetThemeMode,
+  onSelectTheme,
+  onSetCustomWallpaper,
+  onRemoveCustomWallpaper,
   t,
   currentLanguageName,
   currentLanguageFlag,
@@ -71,6 +81,9 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   appearance,
   chatCount,
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = React.useState(false);
+
   if (!isOpen) return null;
 
   const handleAction = (action: DrawerAction, e: React.MouseEvent, color = '#6366f1') => {
@@ -83,6 +96,22 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
     triggerVisualFx(e.clientX, e.clientY, mode === 'light' ? '#f59e0b' : '#6366f1');
     playTechClickSound('tap');
     onSetThemeMode?.(mode);
+  };
+
+  const handleGalleryFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessingImage(true);
+    try {
+      const compressedDataUrl = await processGalleryImage(file);
+      playTechClickSound('magic');
+      onSetCustomWallpaper?.(compressedDataUrl, file.name);
+    } catch (err) {
+      console.error('Failed to process image from gallery:', err);
+    } finally {
+      setIsProcessingImage(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   return (
@@ -222,6 +251,168 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
                   Whole App Dark
                 </div>
               </button>
+            </div>
+          </div>
+
+          {/* ADD THEME FROM GALLERY OPTION */}
+          <div className="pt-1 pb-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleGalleryFileSelect}
+            />
+            <div className="flex items-center justify-between px-3 py-1 mb-1.5">
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <ImagePlus className="w-3.5 h-3.5 text-pink-500" />
+                <span>Theme From Gallery</span>
+              </span>
+              {appearance.customWallpaper ? (
+                <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                  Active in Theme
+                </span>
+              ) : (
+                <span className="text-[10px] text-pink-600 dark:text-pink-400 font-semibold">
+                  Custom Picture
+                </span>
+              )}
+            </div>
+
+            {appearance.customWallpaper ? (
+              /* Active Gallery Theme Preview Card */
+              <div className="mx-1 p-2.5 rounded-2xl border-2 border-pink-500/50 bg-pink-500/5 dark:bg-pink-950/30 flex items-center gap-3 shadow-xs">
+                <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-pink-500/40 shadow-xs relative bg-slate-900">
+                  <img
+                    src={appearance.customWallpaper}
+                    alt="Active Gallery Theme"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-1 right-1 p-0.5 rounded-full bg-emerald-500 text-white shadow-xs">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {appearance.customWallpaperName || 'Gallery Photo Theme'}
+                  </div>
+                  <div className="text-[10px] text-pink-600 dark:text-pink-400 font-medium">
+                    Saved in AI Front Theme
+                  </div>
+                  <div className="flex items-center gap-2.5 mt-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isProcessingImage}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                    >
+                      <Upload className="w-3 h-3" />
+                      {isProcessingImage ? 'Loading...' : 'Change Photo'}
+                    </button>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        triggerVisualFx(e.clientX, e.clientY, '#ef4444');
+                        playTechClickSound('tap');
+                        onRemoveCustomWallpaper?.();
+                      }}
+                      className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Reset to Themes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Choose Picture from Gallery Button */
+              <button
+                type="button"
+                onClick={(e) => {
+                  triggerVisualFx(e.clientX, e.clientY, '#ec4899');
+                  playTechClickSound('tap');
+                  fileInputRef.current?.click();
+                }}
+                disabled={isProcessingImage}
+                className="clickable-option w-full flex items-center justify-between p-3 rounded-2xl border border-dashed border-pink-400/80 dark:border-pink-500/60 bg-gradient-to-r from-pink-50/70 via-purple-50/50 to-indigo-50/70 dark:from-pink-950/20 dark:via-purple-950/20 dark:to-indigo-950/20 hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-950/30 transition-all text-left group shadow-xs active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-pink-100 dark:bg-pink-950/80 text-pink-600 dark:text-pink-400 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span>Add Theme from Gallery</span>
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-pink-500 text-white">
+                        Photo
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {isProcessingImage ? 'Loading picture...' : 'Choose any photo from gallery to save as theme'}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-1.5 rounded-xl bg-white/80 dark:bg-slate-800/80 text-pink-600 dark:text-pink-400 group-hover:-translate-y-0.5 transition-transform shadow-2xs">
+                  <Upload className="w-4 h-4" />
+                </div>
+              </button>
+            )}
+          </div>
+
+          {/* 10 AI FRONT THEMES WITH COLOR NAMES */}
+          <div className="pt-1 pb-3">
+            <div className="flex items-center justify-between px-3 py-1 mb-1">
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-indigo-500" />
+                <span>AI Front Themes (10 Colors)</span>
+              </span>
+              <button
+                type="button"
+                onClick={(e) => handleAction('appearance', e, '#6366f1')}
+                className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                Full Customizer
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-1.5 px-1 max-h-56 overflow-y-auto scrollbar-thin">
+              {TEN_THEMES.map((theme) => {
+                const isSelected = !appearance.customWallpaper && (appearance.themeColor || 'royal-midnight-purple') === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={(e) => {
+                      triggerVisualFx(e.clientX, e.clientY, theme.primaryColor);
+                      playTechClickSound('tap');
+                      onSelectTheme?.(theme.id);
+                    }}
+                    title={`${theme.name} - ${theme.tagline}`}
+                    className={`clickable-option flex items-center gap-2 p-2 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/70 shadow-xs ring-2 ring-indigo-500/20'
+                        : 'border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full shrink-0 shadow-2xs border border-black/10 dark:border-white/20"
+                      style={{ background: theme.bgGradient }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-bold truncate text-slate-800 dark:text-slate-200 leading-tight">
+                        {theme.name}
+                      </div>
+                      <div className="text-[9px] text-slate-400 truncate capitalize">
+                        {theme.mode} Mode
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

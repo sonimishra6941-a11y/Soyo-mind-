@@ -167,6 +167,7 @@ export const VoiceModeModal: React.FC<VoiceModeModalProps> = ({
           message: userText,
           messages: contextMsgs,
           language: languageName,
+          voiceTone: voiceSettings?.voiceTone || 'jarvis-deep',
         }),
       });
 
@@ -199,27 +200,30 @@ export const VoiceModeModal: React.FC<VoiceModeModalProps> = ({
       setOrbState('speaking');
       speechService.speak(
         aiReply,
-        voiceSettings?.speed || 1.05,
-        voiceSettings?.pitch || 1.0,
-        voiceSettings?.voiceIndex ?? -1,
-        // onEnd:
-        () => {
-          if (!isMountedRef.current) return;
-          // IF Continuous Conversation is ON, resume listening automatically like ChatGPT
-          if (isContinuousRef.current) {
-            setOrbState('listening');
-            startVoiceListeningLoop();
-          } else {
-            setOrbState('idle');
-          }
-        },
-        // onBoundary
-        undefined,
-        // onStart
-        () => {
-          if (isMountedRef.current) {
-            setOrbState('speaking');
-          }
+        {
+          speed: voiceSettings?.speed || 1.02,
+          pitch: voiceSettings?.pitch !== undefined ? voiceSettings.pitch : 0.88,
+          voiceIndex: voiceSettings?.voiceIndex ?? -1,
+          voiceGender: voiceSettings?.voiceGender || 'male',
+          voiceName: voiceSettings?.voiceName,
+          voiceTone: voiceSettings?.voiceTone || 'jarvis-deep',
+          // onEnd:
+          onEnd: () => {
+            if (!isMountedRef.current) return;
+            // IF Continuous Conversation is ON, resume listening automatically like ChatGPT
+            if (isContinuousRef.current) {
+              setOrbState('listening');
+              startVoiceListeningLoop();
+            } else {
+              setOrbState('idle');
+            }
+          },
+          // onStart
+          onStart: () => {
+            if (isMountedRef.current) {
+              setOrbState('speaking');
+            }
+          },
         }
       );
     } catch (err: any) {

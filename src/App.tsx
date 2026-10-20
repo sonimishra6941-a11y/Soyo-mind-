@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Header } from './components/Header';
 import { AiOrb } from './components/AiOrb';
 import { ChatInputBar } from './components/ChatInputBar';
@@ -34,15 +34,17 @@ import {
   UserProfile,
   AppearanceSettings,
   VoiceSettings,
+  ThemeId,
 } from './types';
 import { speechService } from './services/speech';
 import { triggerVisualFx, playTechClickSound } from './utils/visualFx';
+import { getThemeById, TEN_THEMES } from './data/themes';
 import { Sparkles, Key } from 'lucide-react';
 
 const STORAGE_KEY_SESSIONS = 'soyo_mind_sessions_v3';
 const STORAGE_KEY_LANG = 'soyo_mind_lang_v3';
-const STORAGE_KEY_APPEARANCE = 'soyo_mind_appearance_v3';
-const STORAGE_KEY_VOICE = 'soyo_mind_voice_v3';
+const STORAGE_KEY_APPEARANCE = 'soyo_mind_appearance_v4';
+const STORAGE_KEY_VOICE = 'soyo_mind_voice_v4';
 const STORAGE_KEY_PROFILE = 'soyo_mind_profile_v4';
 
 export default function App() {
@@ -57,30 +59,39 @@ export default function App() {
 
   const t = getTranslation(selectedLanguage.code);
 
-  // 2. Appearance State
+  // 2. Appearance & 10 AI Front Themes State
   const [appearance, setAppearance] = useState<AppearanceSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_APPEARANCE);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) return parsed;
+      }
     } catch {}
     return {
-      mode: 'light',
-      themeColor: 'blue-purple',
+      mode: 'dark',
+      themeColor: 'royal-midnight-purple',
       fontSize: 'medium',
     };
   });
 
+  const activeTheme = useMemo(() => getThemeById(appearance.themeColor), [appearance.themeColor]);
+
   // Apply Appearance classes to document root
   useEffect(() => {
     const root = document.documentElement;
-    if (appearance.mode === 'dark') {
+    const theme = getThemeById(appearance.themeColor);
+    const effectiveMode =
+      appearance.mode === 'system'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light'
+        : appearance.mode || theme.mode;
+
+    if (effectiveMode === 'dark') {
       root.classList.add('dark');
-    } else if (appearance.mode === 'light') {
-      root.classList.remove('dark');
     } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) root.classList.add('dark');
-      else root.classList.remove('dark');
+      root.classList.remove('dark');
     }
     localStorage.setItem(STORAGE_KEY_APPEARANCE, JSON.stringify(appearance));
   }, [appearance]);
@@ -90,23 +101,29 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY_LANG, JSON.stringify(selectedLanguage));
   }, [selectedLanguage]);
 
-  // 3. Voice Settings State
+  // 3. Voice Settings State (Default: Male Jarvis AI with deep resonant pitch)
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_VOICE);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) return parsed;
+      }
     } catch {}
     return {
-      voiceGender: 'female',
+      voiceGender: 'male',
       voiceIndex: -1,
-      speed: 1.0,
-      pitch: 1.0,
+      speed: 1.02,
+      pitch: 0.88, // Deep resonant Jarvis pitch
       autoReadResponses: false,
+      preset: 'jarvis',
+      voiceName: '',
     };
   });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_VOICE, JSON.stringify(voiceSettings));
+    speechService.updateSettings(voiceSettings);
   }, [voiceSettings]);
 
   // 4. User Profile State (Default: Guest so Log In button is prominently shown)
@@ -297,6 +314,7 @@ export default function App() {
           messages: historyPayload,
           language: selectedLanguage.name,
           attachments: attachments,
+          voiceTone: voiceSettings.voiceTone || 'jarvis-deep',
         }),
       });
 
@@ -376,12 +394,16 @@ export default function App() {
         setActiveSpeakingMsgId(assistantMsgId);
         speechService.speak(
           accumulatedText,
-          voiceSettings.speed,
-          voiceSettings.pitch,
-          voiceSettings.voiceIndex,
-          () => {
-            setOrbState('idle');
-            setActiveSpeakingMsgId(null);
+          {
+            speed: voiceSettings.speed,
+            pitch: voiceSettings.pitch,
+            voiceIndex: voiceSettings.voiceIndex,
+            voiceGender: voiceSettings.voiceGender,
+            voiceName: voiceSettings.voiceName,
+            onEnd: () => {
+              setOrbState('idle');
+              setActiveSpeakingMsgId(null);
+            },
           }
         );
       } else {
@@ -555,12 +577,36 @@ export default function App() {
 
   const hasMessages = messages.length > 0;
 
+  const isDarkCanvas =
+    appearance.mode === 'dark' ||
+    (appearance.mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ||
+    (appearance.mode !== 'light' && activeTheme.mode === 'dark');
+
   return (
-    <div className={`relative flex flex-col h-screen w-screen overflow-hidden font-sans transition-colors duration-300 ${
-      appearance.mode === 'light'
-        ? 'bg-white text-slate-900'
-        : 'bg-slate-950 text-slate-100'
-    }`}>
+    <div
+      className={`relative flex flex-col h-screen w-screen overflow-hidden font-sans transition-all duration-700 ${
+        isDarkCanvas ? 'dark text-slate-100' : 'text-slate-900'
+      }`}
+      style={{
+        background: appearance.customWallpaper ? undefined : activeTheme.bgGradient,
+      }}
+    >
+      {/* Dynamic Gallery Wallpaper Layer */}
+      {appearance.customWallpaper && (
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 pointer-events-none"
+          style={{
+            backgroundImage: `url(${appearance.customWallpaper})`,
+          }}
+        >
+          {/* Contrast scrim overlay to make text, orb & controls crystal clear */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-500 ${
+              isDarkCanvas ? 'bg-slate-950/60 backdrop-blur-[2px]' : 'bg-white/50 backdrop-blur-[2px]'
+            }`}
+          />
+        </div>
+      )}
       
       {/* Unique Visual Click Effect Manager (Sparks, Radiant Halo & Audio Chime) */}
       <ClickFxManager />
@@ -586,11 +632,12 @@ export default function App() {
         {!hasMessages ? (
           /* HOME SCREEN: Center Orb + Greeting + Central Search Bar */
           <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 animate-in fade-in duration-500">
-            {/* Center Animated Liquid AI Orb */}
+            {/* Center Animated Liquid AI Orb with Theme Morphing */}
             <AiOrb
               state={orbState}
               greetingTitle={t.goodMorning}
               subtitle={t.howCanIHelp}
+              themeId={appearance.themeColor}
               onClick={() => {
                 playTechClickSound('magic');
                 setIsVoiceModeOpen(true);
@@ -696,12 +743,36 @@ export default function App() {
         </div>
       )}
 
-      {/* Sidebar Drawer (15 features + theme switches) */}
+      {/* Sidebar Drawer (15 features + 10 theme switches) */}
       <SidebarDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onSelectAction={handleSelectDrawerAction}
         onSetThemeMode={(mode) => setAppearance((prev) => ({ ...prev, mode }))}
+        onSelectTheme={(themeId) => {
+          const targetTheme = getThemeById(themeId);
+          setAppearance((prev) => ({
+            ...prev,
+            themeColor: themeId,
+            mode: targetTheme.mode,
+            customWallpaper: undefined, // Reset custom wallpaper so selected 10-theme immediately shows
+            customWallpaperName: undefined,
+          }));
+        }}
+        onSetCustomWallpaper={(wallpaperDataUrl, fileName) => {
+          setAppearance((prev) => ({
+            ...prev,
+            customWallpaper: wallpaperDataUrl,
+            customWallpaperName: fileName || 'Gallery Theme Picture',
+          }));
+        }}
+        onRemoveCustomWallpaper={() => {
+          setAppearance((prev) => ({
+            ...prev,
+            customWallpaper: undefined,
+            customWallpaperName: undefined,
+          }));
+        }}
         t={t}
         currentLanguageName={selectedLanguage.name}
         currentLanguageFlag={selectedLanguage.flag}
