@@ -40,6 +40,23 @@ import { speechService } from './services/speech';
 import { triggerVisualFx, playTechClickSound } from './utils/visualFx';
 import { getThemeById, TEN_THEMES } from './data/themes';
 import { Sparkles, Key } from 'lucide-react';
+// --- YAHAN SE NAYA CODE PASTE KARO - KISKE BAAD ---
+// Line 42: import { Sparkles, Key } from 'lucide-react' ISKE BAAD
+
+const SideWave = ({ active }: { active: boolean }) => {
+  if (!active) return null;
+  return (
+    <div className="fixed left-0 top-1/2 -translate-y-1/2 z-[60] flex flex-col gap-[3px] p-3 pointer-events-none">
+      {[...Array(14)].map((_, i) => (
+        <div key={i} className="w-1.5 bg-gradient-to-b from-violet-500 to-cyan-400 rounded-full" style={{ height: `${10 + Math.random()*32}px`, animation: `waveAnim 0.6s ease-in-out ${i*0.07}s infinite` }} />
+      ))}
+      <style>{`@keyframes waveAnim { 0%,100%{height:8px} 50%{height:38px} }`}</style>
+    </div>
+  );
+};
+
+const STORAGE_KEY_SESSIONS = 'soyo_mind_sessions_v3';
+// --- YAHAN TAK
 
 const STORAGE_KEY_SESSIONS = 'soyo_mind_sessions_v3';
 const STORAGE_KEY_LANG = 'soyo_mind_lang_v3';
